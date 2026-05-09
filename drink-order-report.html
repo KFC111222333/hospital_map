@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mega Drink 訂購系統</title>
+    <style>
+        :root {
+            --mega-yellow: #ffeb3b;
+            --mega-black: #212121;
+            --mega-gray: #f5f5f5;
+            --accent-pink: #e91e63;
+        }
+        
+        * { box-sizing: border-box; font-family: "Microsoft JhengHei", sans-serif; }
+        
+        body { margin: 0; background-color: var(--mega-gray); color: var(--mega-black); padding-bottom: 160px; }
+
+        /* 標題欄 */
+        header {
+            background-color: var(--mega-yellow);
+            padding: 15px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 1.2rem;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        /* 橫向滑動區 (推薦新品) */
+        .section-title {
+            margin: 15px 0 5px 15px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            border-left: 4px solid var(--mega-yellow);
+            padding-left: 8px;
+        }
+
+        .scroll-container {
+            display: flex;
+            overflow-x: auto;
+            padding: 10px 15px;
+            gap: 12px;
+            scrollbar-width: none;
+        }
+        .scroll-container::-webkit-scrollbar { display: none; }
+
+        .scroll-item {
+            min-width: 120px;
+            background: #fff;
+            border-radius: 15px;
+            padding: 15px 10px;
+            text-align: center;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+        }
+        .scroll-item .icon { font-size: 40px; margin-bottom: 5px; }
+        .scroll-item .name { font-size: 0.8rem; font-weight: bold; white-space: nowrap; }
+        .scroll-item .price { color: var(--accent-pink); font-size: 0.8rem; font-weight: bold; }
+
+        /* 全部清單區 */
+        .order-list {
+            background: #fff;
+            margin: 10px 12px;
+            border-radius: 20px;
+            padding: 5px 15px;
+        }
+        .list-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .list-row:last-child { border-bottom: none; }
+        .info h4 { margin: 0; font-size: 0.95rem; }
+        .info p { margin: 0; font-size: 0.8rem; color: #888; }
+
+        /* 數量按鈕 */
+        .controls { display: flex; align-items: center; gap: 10px; }
+        .btn-qty {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            border: 1px solid #ddd;
+            background: #fff;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        .qty-num { font-weight: bold; color: blue; width: 20px; text-align: center; }
+
+        /* 折扣設定 */
+        .discount-area { background: #fff; margin: 10px 12px; padding: 15px; border-radius: 15px; }
+        .disc-btns { display: flex; gap: 10px; margin-top: 10px; }
+        .btn-disc { padding: 6px 15px; border-radius: 20px; border: 1px solid #ddd; background: #fff; font-size: 0.85rem; }
+        .btn-disc.active { background: var(--mega-yellow); border-color: var(--mega-yellow); font-weight: bold; }
+
+        /* 底部固定面板 */
+        .footer-panel { position: fixed; bottom: 0; left: 0; width: 100%; z-index: 2000; }
+        .price-box {
+            background: var(--mega-black);
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .total-price { font-size: 1.3rem; font-weight: bold; color: var(--mega-yellow); }
+        .btn-pay {
+            background: var(--mega-yellow);
+            color: var(--mega-black);
+            border: none;
+            padding: 10px 25px;
+            border-radius: 10px;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        nav { background: #fff; display: flex; justify-content: space-around; padding: 8px 0; border-top: 1px solid #eee; }
+        .nav-item { text-align: center; font-size: 0.65rem; color: #999; }
+        .nav-center {
+            width: 50px; height: 50px; background: var(--mega-black); color: var(--mega-yellow);
+            border-radius: 15px; margin-top: -25px; display: flex; align-items: center; justify-content: center;
+            font-size: 1.4rem; box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        /* --- 報表彈出視窗 --- */
+        #report-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            z-index: 3000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .report-card {
+            background: white;
+            width: 100%;
+            max-width: 400px;
+            border-radius: 20px;
+            padding: 25px;
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+        .report-header { text-align: center; border-bottom: 2px dashed #ddd; padding-bottom: 15px; margin-bottom: 15px; }
+        .report-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        .report-table th { text-align: left; color: #888; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+        .report-table td { padding: 12px 0; border-bottom: 1px solid #f9f9f9; font-size: 0.9rem; }
+        .report-footer { margin-top: 20px; text-align: right; line-height: 1.8; border-top: 1px solid #eee; padding-top: 15px; }
+        .btn-close-report {
+            width: 100%; background: var(--mega-black); color: white; border: none;
+            padding: 12px; border-radius: 10px; margin-top: 20px; font-weight: bold; cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <header>Mega Drink 訂購系統</header>
+
+    <div class="section-title">推薦新品</div>
+    <div class="scroll-container" id="scroll-list"></div>
+
+    <div class="section-title">點餐清單</div>
+    <div class="order-list" id="main-list"></div>
+
+    <div class="discount-area">
+        <div style="font-weight:bold; font-size:0.9rem;">選擇折數</div>
+        <div class="disc-btns">
+            <button class="btn-disc active" onclick="setDisc(0.9, this)">9折</button>
+            <button class="btn-disc" onclick="setDisc(0.75, this)">75折</button>
+            <input type="number" id="cust-disc" placeholder="其他(如0.8)" 
+                   style="width: 80px; padding: 5px; border-radius: 5px; border:1px solid #ddd;"
+                   oninput="setCustomDisc(this.value)">
+        </div>
+    </div>
+
+    <div class="footer-panel">
+        <div class="price-box">
+            <div>
+                <span style="font-size: 0.7rem; color: #aaa;" id="raw-info">原價: $0</span><br>
+                <span class="total-price">NT$ <span id="display-price">0</span></span>
+            </div>
+            <button class="btn-pay" onclick="showReport()">立即結帳</button>
+        </div>
+        <nav>
+            <div class="nav-item">🏠<br>首頁</div>
+            <div class="nav-item">📅<br>活動</div>
+            <div class="nav-center">M</div>
+            <div class="nav-item">🎁<br>禮物</div>
+            <div class="nav-item">☰<br>菜單</div>
+        </nav>
+    </div>
+
+    <!-- 報表彈窗 -->
+    <div id="report-modal">
+        <div class="report-card">
+            <div class="report-header">
+                <h2 style="margin:0;">訂單確認報表</h2>
+                <div style="font-size:0.8rem; color:#666; margin-top:5px;" id="report-id"></div>
+            </div>
+            <table class="report-table">
+                <thead>
+                    <tr><th>項目</th><th style="text-align:center;">數量</th><th style="text-align:right;">小計</th></tr>
+                </thead>
+                <tbody id="report-body"></tbody>
+            </table>
+            <div class="report-footer">
+                <div>原價總計：$<span id="report-raw">0</span></div>
+                <div>折扣比例：<span id="report-disc-rate">90</span>%</div>
+                <div style="font-size: 1.4rem; color: var(--accent-pink); font-weight: bold; margin-top: 5px;">
+                    應付總額：$<span id="report-final">0</span>
+                </div>
+            </div>
+            <button class="btn-close-report" onclick="closeReport()">關閉並返回</button>
+        </div>
+    </div>
+
+    <script>
+        const drinkData = [
+            { id: 1, name: "美式咖啡", price: 60, icon: "☕" },
+            { id: 2, name: "蜂蜜西瓜汁", price: 85, icon: "🍉" },
+            { id: 3, name: "抹茶紅豆冰沙", price: 95, icon: "🍵" },
+            { id: 4, name: "芒果椰奶", price: 90, icon: "🥭" },
+            { id: 5, name: "珍珠奶茶", price: 65, icon: "🧋" },
+            { id: 6, name: "焦糖瑪奇朵", price: 110, icon: "🍮" },
+            { id: 7, name: "青檸蘇打", price: 75, icon: "🍋" },
+            { id: 8, name: "草莓優格", price: 120, icon: "🍓" },
+            { id: 9, name: "燕麥拿鐵", price: 95, icon: "🌾" },
+            { id: 10, name: "高山青茶", price: 45, icon: "🍃" },
+            { id: 11, name: "葡萄柚綠", price: 70, icon: "🍊" },
+            { id: 12, name: "經典可可", price: 80, icon: "🍫" },
+            { id: 13, name: "英式奶茶", price: 55, icon: "🥛" },
+            { id: 14, name: "冰淇淋紅茶", price: 75, icon: "🍦" },
+            { id: 15, name: "黑糖珍珠", price: 80, icon: "🔘" }
+        ];
+
+        let counts = {};
+        let discount = 0.9;
+
+        function init() {
+            const scroll = document.getElementById('scroll-list');
+            const main = document.getElementById('main-list');
+            drinkData.forEach((item, idx) => {
+                counts[item.id] = 0;
+                if (idx < 4) {
+                    const div = document.createElement('div');
+                    div.className = 'scroll-item';
+                    div.innerHTML = `<div class="icon">${item.icon}</div><div class="name">${item.name}</div><div class="price">$${item.price}</div>`;
+                    scroll.appendChild(div);
+                }
+                const row = document.createElement('div');
+                row.className = 'list-row';
+                row.innerHTML = `
+                    <div class="info"><h4>${item.icon} ${item.name}</h4><p>$${item.price}</p></div>
+                    <div class="controls">
+                        <div class="btn-qty" onclick="changeQty(${item.id}, -1)">-</div>
+                        <div class="qty-num" id="q-${item.id}">0</div>
+                        <div class="btn-qty" onclick="changeQty(${item.id}, 1)">+</div>
+                    </div>`;
+                main.appendChild(row);
+            });
+        }
+
+        function changeQty(id, delta) {
+            counts[id] = Math.max(0, counts[id] + delta);
+            document.getElementById(`q-${id}`).innerText = counts[id];
+            updateDisplay();
+        }
+
+        function setDisc(val, btn) {
+            discount = val;
+            document.querySelectorAll('.btn-disc').forEach(b => b.classList.remove('active'));
+            if(btn) btn.classList.add('active');
+            updateDisplay();
+        }
+
+        function setCustomDisc(val) {
+            if(val > 0 && val <= 1.5) { setDisc(parseFloat(val), null); }
+        }
+
+        function updateDisplay() {
+            let raw = 0;
+            drinkData.forEach(item => { raw += counts[item.id] * item.price; });
+            document.getElementById('raw-info').innerText = `原價: $${raw}`;
+            document.getElementById('display-price').innerText = Math.round(raw * discount);
+        }
+
+        function showReport() {
+            const body = document.getElementById('report-body');
+            body.innerHTML = '';
+            let rawTotal = 0;
+            let hasItem = false;
+
+            drinkData.forEach(item => {
+                if (counts[item.id] > 0) {
+                    hasItem = true;
+                    let sub = counts[item.id] * item.price;
+                    rawTotal += sub;
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `<td>${item.name}</td><td style="text-align:center;">${counts[item.id]}</td><td style="text-align:right;">$${sub}</td>`;
+                    body.appendChild(tr);
+                }
+            });
+
+            if (!hasItem) { alert('請先選擇飲品！'); return; }
+
+            const now = new Date();
+            const orderId = "ME-" + now.getFullYear() + String(now.getMonth()+1).padStart(2, '0') + String(now.getDate()).padStart(2, '0') + 
+                            String(now.getHours()).padStart(2, '0') + String(now.getMinutes()).padStart(2, '0') + String(now.getSeconds()).padStart(2, '0') +
+                            "-" + Math.floor(Math.random()*900 + 100);
+
+            document.getElementById('report-id').innerText = "編號：" + orderId;
+            document.getElementById('report-raw').innerText = rawTotal;
+            document.getElementById('report-disc-rate').innerText = (discount * 100);
+            document.getElementById('report-final').innerText = Math.round(rawTotal * discount);
+            document.getElementById('report-modal').style.display = 'flex';
+        }
+
+        function closeReport() {
+            document.getElementById('report-modal').style.display = 'none';
+        }
+
+        init();
+    </script>
+</body>
+</html>
