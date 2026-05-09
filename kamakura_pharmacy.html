@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>江之島周邊藥局地圖</title>
+    
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <style>
+        :root {
+            --primary-color: #00897b;
+            --accent-color: #ff5722;
+            --bg-color: #e0f2f1;
+        }
+
+        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif; }
+
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* 上方：地圖區 */
+        #map {
+            flex: 0 0 45%; 
+            width: 100%;
+            z-index: 1;
+        }
+
+        /* 下方：藥局列表 */
+        .list-section {
+            flex: 1;
+            overflow-y: auto;
+            background-color: var(--bg-color);
+            z-index: 2;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+        }
+
+        .list-header {
+            padding: 12px 15px;
+            background: #fff;
+            font-size: 14px;
+            font-weight: bold;
+            color: var(--primary-color);
+            border-bottom: 1px solid #eee;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .pharmacy-card {
+            background: white;
+            margin: 8px 12px;
+            padding: 15px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 5px solid var(--primary-color);
+        }
+
+        .pharmacy-card:active {
+            background-color: #f1f1f1;
+        }
+
+        .info h3 { margin: 0; font-size: 15px; color: #333; }
+        .info p { margin: 4px 0 0; font-size: 12px; color: #666; }
+
+        .nav-btn {
+            background: var(--primary-color);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            border: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div id="map"></div>
+    <div class="list-section">
+        <div class="list-header">藤澤・鎌倉區域藥局</div>
+        <div id="pharmacy-list"></div>
+    </div>
+</div>
+
+<script>
+    // 1. 初始化地圖 (中心點設在圖片中的 Shinwa Pharmacy 附近)
+    const map = L.map('map', { zoomControl: false }).setView([35.3262, 139.4915], 14);
+
+    // 2. 載入 OpenStreetMap 圖資
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OSM'
+    }).addTo(map);
+
+    // 3. 根據圖片位置提取的藥局數據
+    const pharmacies = [
+        { name: "Shinwa Pharmacy (親和薬局)", lat: 35.3262, lng: 139.4915, addr: "神奈川県藤沢市片瀬山" },
+        { name: "あおぞら薬局 (Aozora)", lat: 35.3345, lng: 139.4850, addr: "神奈川県藤沢市鵠沼桜が岡" },
+        { name: "すばる中央薬局", lat: 35.3370, lng: 139.4985, addr: "神奈川県藤沢市藤沢" },
+        { name: "中央薬局 藤沢店", lat: 35.3410, lng: 139.4880, addr: "神奈川県藤沢市鵠沼石上" },
+        { name: "マンボウ薬局", lat: 35.3125, lng: 139.5150, addr: "神奈川県鎌倉市七里ガ浜" },
+        { name: "アイセイ薬局", lat: 35.3440, lng: 139.4830, addr: "神奈川県藤沢市鵠沼" }
+    ];
+
+    const listContainer = document.getElementById('pharmacy-list');
+
+    // 4. 生成標記與列表
+    pharmacies.forEach(p => {
+        const marker = L.marker([p.lat, p.lng]).addTo(map)
+            .bindPopup(`<b>${p.name}</b><br>${p.addr}`);
+
+        const card = document.createElement('div');
+        card.className = 'pharmacy-card';
+        card.innerHTML = `
+            <div class="info">
+                <h3>${p.name}</h3>
+                <p>${p.addr}</p>
+            </div>
+            <button class="nav-btn">查看</button>
+        `;
+
+        card.onclick = () => {
+            map.flyTo([p.lat, p.lng], 16);
+            marker.openPopup();
+        };
+
+        listContainer.appendChild(card);
+    });
+
+    window.addEventListener('resize', () => map.invalidateSize());
+</script>
+
+</body>
+</html>
