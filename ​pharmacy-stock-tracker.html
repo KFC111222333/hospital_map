@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pharmacy Mask Map</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <style>
+        body, html { margin: 0; padding: 0; font-family: "Microsoft JhengHei", sans-serif; background: #f0f4f4; }
+        #map { height: 45vh; width: 100%; border-bottom: 2px solid #ddd; }
+        
+        .pharmacy-list { padding: 15px; height: 55vh; overflow-y: auto; }
+        .list-title { color: #00796b; font-weight: bold; margin-bottom: 15px; font-size: 1.1rem; }
+        
+        .pharmacy-card {
+            background: white;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border-left: 6px solid #009688;
+        }
+        
+        .info h3 { margin: 0 0 5px 0; font-size: 1rem; color: #333; }
+        .info p { margin: 0; font-size: 0.85rem; color: #666; }
+        .mask-count { color: #e91e63; font-weight: bold; margin-top: 5px; font-size: 0.9rem; }
+        
+        .view-btn {
+            background: #00897b;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .view-btn:active { transform: scale(0.95); background: #00695c; }
+
+        /* 修正與強化訊息框 (Popup) 樣式 */
+        .leaflet-popup-content-wrapper { border-radius: 12px; padding: 5px; }
+        .popup-info b { color: #00796b; font-size: 1.1rem; display: block; margin-bottom: 3px; }
+        .popup-info p { margin: 2px 0; color: #555; font-size: 0.9rem; }
+        .popup-mask { color: #e91e63; font-weight: bold; font-size: 1rem; display: block; margin-top: 5px; }
+    </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div class="pharmacy-list">
+    <div class="list-title">藤澤・鎌倉區域藥局</div>
+    <div id="pharmacy-items"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    // 1. 初始化地圖 (設定座標與比例)
+    const map = L.map('map', { zoomControl: false }).setView([35.3262, 139.4915], 15);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+    // 2. 藥局資料庫
+    const pharmacies = [
+        { name: "Shinwa Pharmacy (親和藥局)", addr: "神奈川県藤沢市片瀬山", lat: 35.3262, lng: 139.4915 },
+        { name: "あおぞら薬局 (Aozora)", addr: "神奈川県藤沢市鵠沼桜が岡", lat: 35.3300, lng: 139.4850 },
+        { name: "すばる中央薬局", addr: "神奈川県藤沢市藤沢", lat: 35.3385, lng: 139.4890 },
+        { name: "中央薬局 藤沢店", addr: "神奈川県藤沢市鵠沼石上", lat: 35.3350, lng: 139.4870 }
+    ];
+
+    // 儲存 Marker 的物件，方便之後透過按鈕呼叫
+    const markers = {};
+
+    const listContainer = document.getElementById('pharmacy-items');
+
+    // 3. 生成標記與列表
+    pharmacies.forEach((shop, index) => {
+        // 生成 50 ~ 400 之間的口罩亂數
+        const maskStock = Math.floor(Math.random() * 351) + 50;
+        
+        // A. 建立地圖指標 (Marker)
+        const marker = L.marker([shop.lat, shop.lng]).addTo(map);
+        
+        // B. 建立訊息框內容 (還原 1000023758.png 的結構並新增口罩資訊)
+        const popupHTML = `
+            <div class="popup-info">
+                <b>${shop.name}</b>
+                <p>${shop.addr}</p>
+                <span class="popup-mask">口罩剩餘：${maskStock} 片</span>
+            </div>
+        `;
+        marker.bindPopup(popupHTML);
+        markers[index] = marker; // 存入物件
+
+        // C. 建立下方列表卡片
+        const card = document.createElement('div');
+        card.className = 'pharmacy-card';
+        card.innerHTML = `
+            <div class="info">
+                <h3>${shop.name}</h3>
+                <p>${shop.addr}</p>
+                <div class="mask-count">口罩剩餘：${maskStock} 片</div>
+            </div>
+            <button class="view-btn" onclick="focusPharmacy(${index})">查看</button>
+        `;
+        listContainer.appendChild(card);
+    });
+
+    // 4. 定位並「自動彈出」訊息框的功能
+    function focusPharmacy(id) {
+        const target = pharmacies[id];
+        map.flyTo([target.lat, target.lng], 16, { animate: true, duration: 1 });
+        
+        // 延遲一下等畫面移動完後，自動開啟對話框
+        setTimeout(() => {
+            markers[id].openPopup();
+        }, 1000);
+    }
+
+    // 預設啟動：自動開啟第一間藥局的訊息框
+    window.onload = () => {
+        setTimeout(() => {
+            markers[0].openPopup();
+        }, 500);
+    };
+
+</script>
+
+</body>
+</html>
