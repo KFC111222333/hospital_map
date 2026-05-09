@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>台北市醫學中心地圖</title>
+    
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --medical-red: #d32f2f;
+            --bg-color: #f4f7f6;
+        }
+
+        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; font-family: "PingFang TC", "Heiti TC", sans-serif; }
+
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* 上方：地圖區 */
+        #map {
+            flex: 0 0 40%; /* 移動端地圖比例佔 40% */
+            width: 100%;
+            z-index: 1;
+        }
+
+        /* 下方：醫學中心列表 */
+        .list-section {
+            flex: 1;
+            overflow-y: auto;
+            background-color: var(--bg-color);
+            z-index: 2;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+        }
+
+        .list-header {
+            padding: 12px 15px;
+            background: #fff;
+            font-size: 14px;
+            font-weight: bold;
+            color: var(--primary-color);
+            border-bottom: 1px solid #eee;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .hospital-card {
+            background: white;
+            margin: 8px 12px;
+            padding: 15px;
+            border-radius: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 5px solid var(--medical-red);
+            transition: transform 0.1s;
+        }
+
+        .hospital-card:active {
+            transform: scale(0.98);
+            background-color: #f9f9f9;
+        }
+
+        .info h3 { margin: 0; font-size: 16px; color: #333; }
+        .info p { margin: 4px 0 0; font-size: 13px; color: #666; line-height: 1.4; }
+
+        .nav-icon {
+            color: var(--medical-red);
+            font-size: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div id="map"></div>
+    <div class="list-section">
+        <div class="list-header">台北市醫學中心列表 (共 8 間)</div>
+        <div id="hospital-list"></div>
+    </div>
+</div>
+
+<script>
+    // 1. 初始化地圖 (中心點設在台北車站附近)
+    const map = L.map('map', {
+        zoomControl: false // 移動端通常將縮放鈕隱藏以保持簡潔
+    }).setView([25.0478, 121.5170], 12);
+
+    // 2. 載入 OpenStreetMap 免費圖資
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OSM'
+    }).addTo(map);
+
+    // 3. 台北市 8 大醫學中心數據
+    const hospitals = [
+        { name: "台大醫院", lat: 25.0423, lng: 121.5186, addr: "台北市中正區常德街1號" },
+        { name: "台北榮民總醫院", lat: 25.1206, lng: 121.5197, addr: "台北市北投區石牌路二段201號" },
+        { name: "三軍總醫院", lat: 25.0685, lng: 121.5910, addr: "台北市內湖區成功路二段325號" },
+        { name: "台北馬偕紀念醫院", lat: 25.0594, lng: 121.5222, addr: "台北市中山區中山北路二段92號" },
+        { name: "新光吳火獅紀念醫院", lat: 25.0934, lng: 121.5201, addr: "台北市士林區文昌路95號" },
+        { name: "國泰綜合醫院", lat: 25.0375, lng: 121.5492, addr: "台北市大安區仁愛路四段280號" },
+        { name: "台北醫學大學附設醫院", lat: 25.0253, lng: 121.5608, addr: "台北市信義區吳興街252號" },
+        { name: "萬芳醫院", lat: 24.9995, lng: 121.5583, addr: "台北市文山區興隆路三段111號" }
+    ];
+
+    const listContainer = document.getElementById('hospital-list');
+
+    // 4. 生成標記與列表
+    hospitals.forEach(h => {
+        // 在地圖上添加標記
+        const marker = L.marker([h.lat, h.lng]).addTo(map)
+            .bindPopup(`<b>${h.name}</b><br>${h.addr}`);
+
+        // 建立列表卡片
+        const card = document.createElement('div');
+        card.className = 'hospital-card';
+        card.innerHTML = `
+            <div class="info">
+                <h3>${h.name}</h3>
+                <p>${h.addr}</p>
+            </div>
+            <div class="nav-icon">📍</div>
+        `;
+
+        // 點擊卡片交互：地圖平滑移動並跳出視窗
+        card.onclick = () => {
+            map.flyTo([h.lat, h.lng], 15, {
+                animate: true,
+                duration: 1.5
+            });
+            marker.openPopup();
+        };
+
+        listContainer.appendChild(card);
+    });
+
+    // 5. 處理手機旋轉/視窗縮放
+    window.addEventListener('resize', () => map.invalidateSize());
+</script>
+
+</body>
+</html>
