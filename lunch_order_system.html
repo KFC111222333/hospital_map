@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>便當訂購系統</title>
+    <style>
+        body { font-family: "Microsoft JhengHei", Arial, sans-serif; background-color: #f4f4f4; padding: 20px; font-size: 14px; }
+        .container { background: white; padding: 20px; max-width: 950px; margin: auto; border: 1px solid #ccc; box-shadow: 2px 2px 10px rgba(0,0,0,0.1); }
+        h2 { color: #333; margin-top: 0; border-bottom: 2px solid #666; padding-bottom: 5px; }
+        
+        /* 訂購表格樣式 (參考 1000023760.png) */
+        .order-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        .order-table th { background-color: #d4f8d4; border: 1px solid #ccc; padding: 10px; text-align: center; }
+        .order-table td { border: 1px solid #eee; padding: 8px; text-align: left; }
+        .order-table tr:nth-child(even) { background-color: #fffde7; }
+        
+        .qty-input { width: 45px; text-align: center; border: 1px solid #4a90e2; color: blue; font-weight: bold; font-size: 16px; }
+        .note-input { width: 90%; padding: 4px; border: 1px solid #ccc; }
+        .btn-qty { width: 30px; height: 30px; cursor: pointer; font-weight: bold; }
+        
+        /* 管理與統計區塊 (參考 1000023761.png) */
+        .admin-header { background: #f9f9f9; padding: 10px; border: 1px solid #ddd; margin-top: 30px; }
+        .admin-flex { display: flex; gap: 15px; margin-top: 10px; }
+        .info-box { border: 1px solid #ccc; flex: 1; padding: 10px; background: white; }
+        .info-box strong { display: block; background: #e8f5e9; padding: 3px 5px; margin-bottom: 8px; border-bottom: 1px solid #ccc; }
+        
+        .summary-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
+        .summary-table th { background-color: #d4f8d4; border: 1px solid #ccc; padding: 8px; }
+        .summary-table td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+        .person-tag { background-color: #ffcdd2; font-weight: bold; padding: 2px 8px; border-radius: 3px; }
+        
+        .footer-action { margin-top: 20px; padding: 15px; background: #eee; border-radius: 5px; }
+        .btn-main { padding: 8px 20px; cursor: pointer; font-weight: bold; margin-right: 10px; }
+        .discount-text { color: #0000ff; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>便當訂購系統</h2>
+    
+    <!-- 訂購填單區 -->
+    <table class="order-table">
+        <thead>
+            <tr>
+                <th width="30%">名稱</th>
+                <th width="20%">價錢 (NT$)</th>
+                <th width="20%">數量</th>
+                <th width="30%">說明一下</th>
+            </tr>
+        </thead>
+        <tbody id="menu-list">
+            <!-- 由 JavaScript 動態生成 20 個品項 -->
+        </tbody>
+    </table>
+
+    <div class="footer-action">
+        <span style="color: red; font-weight: bold;">*</span> 我是：
+        <input type="text" id="userName" value="小朱" style="width: 150px; padding: 5px;">
+        <button class="btn-main" onclick="processOrder()" style="background: #fff;">訂下去</button>
+        <button class="btn-main" onclick="clearAll()">全部清除</button>
+        <button class="btn-main">取消</button>
+    </div>
+
+    <!-- 後台統計顯示區 -->
+    <div id="admin-view">
+        <div class="admin-header">
+            <strong>統計面板：便當訂購系統 (今日訂單)</strong>
+        </div>
+        <div class="admin-flex">
+            <div class="info-box">
+                <strong>金額計算</strong>
+                共 <span id="total-qty">0</span> 份<br>
+                總價原價：<span id="total-raw">0</span> 元<br>
+                <span class="discount-text">公式 X * 0.9 (九折)：<span id="total-discounted">0</span> 元</span>
+            </div>
+            <div class="info-box">
+                <strong>進度設定</strong>
+                <ul>
+                    <li>截止時間：11:00 AM</li>
+                    <li>狀態：<span style="color:red; font-weight:bold;">訂單進行中</span></li>
+                </ul>
+            </div>
+            <div class="info-box">
+                <strong>公告事項</strong>
+                <p style="color: #666; font-size: 12px;">滿 10 個送飲料，請大家踴躍訂購！</p>
+            </div>
+        </div>
+
+        <table class="summary-table">
+            <thead>
+                <tr>
+                    <th>產品名稱</th>
+                    <th>數量</th>
+                    <th>單價</th>
+                    <th>折扣後小計</th>
+                    <th>訂購人</th>
+                </tr>
+            </thead>
+            <tbody id="summary-list">
+                <!-- 統計結果 -->
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    // 20 個便當品項資料陣列
+    const lunchBoxes = [
+        { name: "經典排骨飯", price: 85 },
+        { name: "香酥雞腿飯", price: 95 },
+        { name: "厚切爌肉飯", price: 85 },
+        { name: "招牌特製便當", price: 80 },
+        { name: "鮮炸鱈魚飯", price: 90 },
+        { name: "薄鹽鯖魚飯", price: 90 },
+        { name: "蜜汁雞排飯", price: 85 },
+        { name: "三杯雞丁飯", price: 85 },
+        { name: "宮保雞丁飯", price: 85 },
+        { name: "泰式打拋豬飯", price: 80 },
+        { name: "紅燒牛腩飯", price: 110 },
+        { name: "蔥爆羊肉飯", price: 100 },
+        { name: "滑蛋蝦仁飯", price: 95 },
+        { name: "蒜泥白肉飯", price: 80 },
+        { name: "酥炸肉捲便當", price: 75 },
+        { name: "古早味滷肉飯", price: 65 },
+        { name: "養身素食便當", price: 80 },
+        { name: "日式炸豬排飯", price: 95 },
+        { name: "韓式泡菜豬肉飯", price: 85 },
+        { name: "雙拼豪華便當", price: 120 }
+    ];
+
+    const menuContainer = document.getElementById('menu-list');
+
+    // 初始化菜單清單
+    lunchBoxes.forEach((item, index) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td><strong>${item.name}</strong></td>
+            <td style="text-align:center;">${item.price}</td>
+            <td style="text-align:center;">
+                <input type="number" id="qty-${index}" class="qty-input" value="0" min="0">
+                <button class="btn-qty" onclick="adjust(${index}, 1)">+</button>
+                <button class="btn-qty" onclick="adjust(${index}, -1)">-</button>
+            </td>
+            <td><input type="text" id="note-${index}" class="note-input" placeholder="註記..."></td>
+        `;
+        menuContainer.appendChild(row);
+    });
+
+    function adjust(index, amount) {
+        const input = document.getElementById(`qty-${index}`);
+        let current = parseInt(input.value);
+        input.value = Math.max(0, current + amount);
+    }
+
+    function processOrder() {
+        const name = document.getElementById('userName').value;
+        if(!name) { alert("請輸入您的名稱！"); return; }
+
+        const summaryContainer = document.getElementById('summary-list');
+        summaryContainer.innerHTML = ''; // 清空舊資料
+        
+        let grandTotalRaw = 0;
+        let grandTotalQty = 0;
+
+        lunchBoxes.forEach((item, index) => {
+            const qty = parseInt(document.getElementById(`qty-${index}`).value);
+            if (qty > 0) {
+                const rawSubtotal = qty * item.price;
+                const discSubtotal = Math.round(rawSubtotal * 0.9); // 九折計算
+                
+                grandTotalQty += qty;
+                grandTotalRaw += rawSubtotal;
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${item.name}</td>
+                    <td>${qty}</td>
+                    <td>${item.price}</td>
+                    <td class="discount-text">${discSubtotal}</td>
+                    <td><span class="person-tag">${name}</span></td>
+                `;
+                summaryContainer.appendChild(tr);
+            }
+        });
+
+        // 更新面板數據 (參考 1000023761.png)
+        document.getElementById('total-qty').innerText = grandTotalQty;
+        document.getElementById('total-raw').innerText = grandTotalRaw;
+        document.getElementById('total-discounted').innerText = Math.round(grandTotalRaw * 0.9);
+        
+        if(grandTotalQty > 0) {
+            alert("訂單已送出，請查看下方統計結果！");
+        } else {
+            alert("請至少選擇一個便當。");
+        }
+    }
+
+    function clearAll() {
+        if(confirm("確定要清除所有輸入嗎？")) {
+            const qtys = document.querySelectorAll('.qty-input');
+            qtys.forEach(q => q.value = 0);
+            const notes = document.querySelectorAll('.note-input');
+            notes.forEach(n => n.value = '');
+        }
+    }
+</script>
+
+</body>
+</html>
