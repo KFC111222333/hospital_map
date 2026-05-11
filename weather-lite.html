@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>極簡氣象預測</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #121212; color: #e5e7eb; font-family: sans-serif; }
+        .card { background: #1e1e1e; border-radius: 1rem; padding: 1.25rem; margin-bottom: 1rem; }
+    </style>
+</head>
+<body class="p-5 max-w-md mx-auto">
+
+    <div class="text-center py-10">
+        <h1 id="location" class="text-lg text-gray-400">正在定位中...</h1>
+        <div id="temp" class="text-7xl font-bold my-2">--°</div>
+        <div id="condition" class="text-xl text-blue-400">讀取中</div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4 mb-6">
+        <div class="card text-center">
+            <p class="text-xs text-gray-500 uppercase">降雨機率</p>
+            <p id="pop" class="text-xl font-semibold">--%</p>
+        </div>
+        <div class="card text-center">
+            <p class="text-xs text-gray-500 uppercase">濕度</p>
+            <p id="humidity" class="text-xl font-semibold">--%</p>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2 class="text-sm font-bold mb-4 border-b border-gray-700 pb-2">本週預報</h2>
+        <div id="forecast" class="space-y-4">
+            </div>
+    </div>
+
+    <script>
+        // 獲取當前 GPS 位置
+        navigator.geolocation.getCurrentPosition(pos => {
+            const { latitude, longitude } = pos.coords;
+            getWeather(latitude, longitude);
+        }, () => {
+            // 失敗時預設台北位置
+            getWeather(25.03, 121.56);
+            document.getElementById('location').innerText = "台北 (未開啟定位)";
+        });
+
+        async function getWeather(lat, lon) {
+            const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max&current_weather=true&relative_humidity_2m_max&timezone=auto`;
+            
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+                renderWeather(data);
+            } catch (e) {
+                document.getElementById('condition').innerText = "讀取失敗";
+            }
+        }
+
+        function renderWeather(data) {
+            // 更新當前
+            document.getElementById('location').innerText = "當前位置";
+            document.getElementById('temp').innerText = `${Math.round(data.current_weather.temperature)}°`;
+            document.getElementById('condition').innerText = getWeatherDesc(data.current_weather.weathercode);
+            document.getElementById('pop').innerText = `${data.daily.precipitation_probability_max[0]}%`;
+            document.getElementById('humidity').innerText = `${data.daily.relative_humidity_2m_max[0]}%`;
+
+            // 更新預報
+            const forecastEl = document.getElementById('forecast');
+            forecastEl.innerHTML = '';
+            
+            for (let i = 0; i < 7; i++) {
+                const date = new Date(data.daily.time[i]).toLocaleDateString('zh-TW', { weekday: 'short' });
+                forecastEl.innerHTML += `
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="w-12">${i === 0 ? '今天' : date}</span>
+                        <span class="text-blue-400 text-xs">${data.daily.precipitation_probability_max[i]}% ☂</span>
+                        <span class="font-mono">${Math.round(data.daily.temperature_2m_max[i])}° / ${Math.round(data.daily.temperature_2m_min[i])}°</span>
+                    </div>
+                `;
+            }
+        }
+
+        function getWeatherDesc(code) {
+            const mapping = {
+                0: "晴朗", 1: "主要晴朗", 2: "多雲", 3: "陰天",
+                45: "霧", 48: "霧", 51: "毛毛雨", 61: "小雨",
+                71: "小雪", 95: "雷雨"
+            };
+            return mapping[code] || "多雲時晴";
+        }
+    </script>
+</body>
+</html>
