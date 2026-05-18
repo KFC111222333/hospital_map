@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RESTful API CRUD 實作展示</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 20px auto; padding: 0 20px; color: #333; }
+        .section { background: #f9f9f9; border: 1px solid #ddd; padding: 15px; margin-bottom: 20px; border-radius: 5px; }
+        h2 { margin-top: 0; color: #007bff; }
+        .form-group { margin-bottom: 10px; }
+        label { display: inline-block; width: 80px; font-weight: bold; }
+        input[type="text"], textarea { width: 300px; padding: 5px; border: 1px solid #ccc; border-radius: 4px; }
+        button { background: #007bff; color: white; border: none; padding: 6px 12px; cursor: pointer; border-radius: 4px; }
+        button:hover { background: #0056b3; }
+        button.delete { background: #dc3545; }
+        button.delete:hover { background: #bd2130; }
+        #logConsole { background: #222; color: #00ff00; padding: 15px; font-family: monospace; white-space: pre-wrap; max-height: 250px; overflow-y: auto; border-radius: 5px; }
+    </style>
+</head>
+<body>
+
+    <h1>RESTful API CRUD 功能展示</h1>
+    <p>操作下方的功能，並觀察最底部的「主機回應日誌」來了解 API 串接狀況。</p>
+
+    <!-- 1. CREATE (新增) -->
+    <div class="section">
+        <h2>1. POST - 新增文章 (Create)</h2>
+        <div class="form-group">
+            <label>標題:</label>
+            <input type="text" id="createTitle" value="今天的技術筆記">
+        </div>
+        <div class="form-group">
+            <label>內容:</label>
+            <textarea id="createBody" rows="2">學習如何使用 fetch 串接 RESTful API...</textarea>
+        </div>
+        <button onclick="createPost()">發送 POST 請求</button>
+    </div>
+
+    <!-- 2. READ (讀取) -->
+    <div class="section">
+        <h2>2. GET - 讀取文章 (Read)</h2>
+        <div class="form-group">
+            <label>文章 ID:</label>
+            <input type="text" id="readId" value="1" style="width: 50px;"> (輸入 1~100)
+        </div>
+        <button onclick="getPost()">發送 GET 請求 (單筆)</button>
+        <button onclick="getAllPosts()" style="background: #28a745;">發送 GET 請求 (全部資料前5筆)</button>
+    </div>
+
+    <!-- 3. UPDATE (更新) -->
+    <div class="section">
+        <h2>3. PUT - 修改文章 (Update)</h2>
+        <div class="form-group">
+            <label>文章 ID:</label>
+            <input type="text" id="updateId" value="1" style="width: 50px;">
+        </div>
+        <div class="form-group">
+            <label>新標題:</label>
+            <input type="text" id="updateTitle" value="修改後的標題">
+        </div>
+        <div class="form-group">
+            <label>新內容:</label>
+            <textarea id="updateBody" rows="2">修改後的內容...</textarea>
+        </div>
+        <button onclick="updatePost()">發送 PUT 請求</button>
+    </div>
+
+    <!-- 4. DELETE (刪除) -->
+    <div class="section">
+        <h2>4. DELETE - 刪除文章 (Delete)</h2>
+        <div class="form-group">
+            <label>文章 ID:</label>
+            <input type="text" id="deleteId" value="1" style="width: 50px;">
+        </div>
+        <button class="delete" onclick="deletePost()">發送 DELETE 請求</button>
+    </div>
+
+    <!-- 日誌顯示區 -->
+    <h2>主機回應日誌 (Response Log)</h2>
+    <div id="logConsole">尚未發送請求...</div>
+
+    <script>
+        const API_URL = 'https://jsonplaceholder.typicode.com/posts';
+        const logConsole = document.getElementById('logConsole');
+
+        // 輔助函式：用來將結果印在網頁畫面上
+        function printLog(action, status, data) {
+            const timestamp = new Date().toLocaleTimeString();
+            logConsole.innerHTML = `[${timestamp}] 執行動作: ${action}\nHTTP 狀態碼: ${status}\n回應資料:\n${JSON.stringify(data, null, 2)}\n\n---------------------------------------\n` + logConsole.innerHTML;
+        }
+
+        // ====== 1. CREATE (POST) ======
+        async function createPost() {
+            const title = document.getElementById('createTitle').value;
+            const body = document.getElementById('createBody').value;
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title, body, userId: 1 })
+                });
+                const data = await response.json();
+                printLog('POST (新增資料)', response.status, data);
+            } catch (error) {
+                printLog('POST 發生錯誤', 'Error', error.message);
+            }
+        }
+
+        // ====== 2. READ (GET) ======
+        // 取得單筆
+        async function getPost() {
+            const id = document.getElementById('readId').value;
+            try {
+                const response = await fetch(`${API_URL}/${id}`);
+                if (!response.ok) throw new Error(`找不到該 ID 的資料 (Status: ${response.status})`);
+                const data = await response.json();
+                printLog(`GET (讀取 ID: ${id})`, response.status, data);
+            } catch (error) {
+                printLog('GET 發生錯誤', 'Error', error.message);
+            }
+        }
+
+        // 取得全部（範例畫面限制只顯示前5筆，避免洗版）
+        async function getAllPosts() {
+            try {
+                const response = await fetch(API_URL);
+                const data = await response.json();
+                const limitData = data.slice(0, 5); // 只取前 5 筆
+                printLog('GET (讀取全部-僅展示前5筆)', response.status, limitData);
+            } catch (error) {
+                printLog('GET 全部發生錯誤', 'Error', error.message);
+            }
+        }
+
+        // ====== 3. UPDATE (PUT) ======
+        async function updatePost() {
+            const id = document.getElementById('updateId').value;
+            const title = document.getElementById('updateTitle').value;
+            const body = document.getElementById('updateBody').value;
+
+            try {
+                const response = await fetch(`${API_URL}/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id, title, body, userId: 1 })
+                });
+                const data = await response.json();
+                printLog(`PUT (修改 ID: ${id})`, response.status, data);
+            } catch (error) {
+                printLog('PUT 發生錯誤', 'Error', error.message);
+            }
+        }
+
+        // ====== 4. DELETE (DELETE) ======
+        async function deletePost() {
+            const id = document.getElementById('deleteId').value;
+
+            try {
+                const response = await fetch(`${API_URL}/${id}`, {
+                    method: 'DELETE'
+                });
+                const data = await response.json(); // 刪除成功通常會回傳空物件 {} 或狀態碼 200
+                printLog(`DELETE (刪除 ID: ${id})`, response.status, data);
+            } catch (error) {
+                printLog('DELETE 發生錯誤', 'Error', error.message);
+            }
+        }
+    </script>
+</body>
+</html>
