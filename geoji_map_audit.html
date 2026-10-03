@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>乞丐地圖 - 社群智能審核版</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- FontAwesome 圖示 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Leaflet.js 地圖 CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        #map { height: 100%; width: 100%; z-index: 10; }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-800 flex justify-center items-center h-screen m-0 overflow-hidden font-sans">
+
+    <!-- 模擬手機外框容器 -->
+    <div class="w-full max-w-md h-full sm:h-[850px] sm:rounded-3xl sm:shadow-2xl bg-white flex flex-col relative overflow-hidden">
+        
+        <!-- 頂部搜尋與過濾列 -->
+        <div class="bg-white px-4 py-3 border-b border-gray-100 flex items-center space-x-2 z-20 shadow-sm">
+            <div class="flex-1 bg-gray-100 flex items-center px-3 py-2 rounded-xl space-x-2">
+                <i class="fa-solid fa-magnifying-glass text-gray-400 text-sm"></i>
+                <input type="text" id="search-input" placeholder="搜尋附近省錢資訊..." class="bg-transparent text-sm w-full focus:outline-none" oninput="filterMarkers()">
+            </div>
+            <button onclick="openReportModal()" class="bg-black text-white px-3.5 py-2 rounded-xl text-xs font-bold flex items-center space-x-1 shadow-md hover:bg-gray-800">
+                <i class="fa-solid fa-plus"></i>
+                <span>回報</span>
+            </button>
+        </div>
+
+        <!-- 地圖互動主畫面 -->
+        <div class="flex-1 relative">
+            <div id="map"></div>
+        </div>
+
+        <!-- 地點詳細卡片（含社群審核與回報失效機制） -->
+        <div id="location-card" class="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-2xl p-5 z-30 transform translate-y-full transition-transform duration-300">
+            <div class="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-3"></div>
+            
+            <div class="flex justify-between items-start mb-2">
+                <div>
+                    <span id="card-badge" class="bg-orange-100 text-orange-600 text-[10px] font-bold px-2 py-0.5 rounded-full">銅板美食</span>
+                    <h3 id="card-title" class="font-bold text-lg mt-1">地點名稱</h3>
+                </div>
+                <button onclick="closeCard()" class="text-gray-400 hover:text-black"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            
+            <p id="card-desc" class="text-xs text-gray-500 mb-3">地點詳細說明...</p>
+            
+            <!-- 即期/審核狀態與共識投票區 -->
+            <div class="bg-gray-50 p-3 rounded-xl border border-gray-100 mb-3 space-y-2">
+                <div class="flex items-center justify-between text-[11px]">
+                    <div class="flex items-center space-x-1.5">
+                        <i class="fa-solid fa-shield-check text-green-600"></i>
+                        <span id="card-status" class="font-bold text-gray-700">社群共識度：95% 正常</span>
+                    </div>
+                    <span id="card-reports" class="text-red-500 font-medium">已被回報失效：0 次</span>
+                </div>
+                
+                <!-- 投票與回報失效按鈕列 -->
+                <div class="flex items-center space-x-2 pt-1 border-t border-gray-200/60">
+                    <button onclick="voteTrust(1)" class="flex-1 bg-white border border-gray-200 py-1.5 rounded-lg text-xs font-bold hover:bg-green-50 text-green-600 flex items-center justify-center space-x-1">
+                        <i class="fa-solid fa-thumbs-up"></i> <span>有效 (<span id="trust-count">24</span>)</span>
+                    </button>
+                    <button onclick="voteTrust(-1)" class="flex-1 bg-white border border-gray-200 py-1.5 rounded-lg text-xs font-bold hover:bg-red-50 text-red-500 flex items-center justify-center space-x-1">
+                        <i class="fa-solid fa-thumbs-down"></i> <span>不實</span>
+                    </button>
+                    <!-- 關鍵：回報失效機制 -->
+                    <button onclick="reportInvalid()" class="bg-orange-50 border border-orange-200 px-3 py-1.5 rounded-lg text-xs font-bold text-orange-600 hover:bg-orange-100 flex items-center space-x-1">
+                        <i class="fa-solid fa-triangle-exclamation"></i> <span>回報失效</span>
+                    </button>
+                </div>
+            </div>
+
+            <button class="w-full bg-black text-white py-2.5 rounded-xl text-xs font-bold shadow hover:bg-gray-800">
+                導航前往此地點
+            </button>
+        </div>
+
+        <!-- 回報新地點彈窗 -->
+        <div id="report-modal" class="absolute inset-0 bg-black/60 backdrop-blur-sm z-40 hidden flex items-center justify-center p-4">
+            <div class="bg-white w-full max-w-sm rounded-3xl p-5 shadow-2xl space-y-3">
+                <div class="flex justify-between items-center">
+                    <h3 class="font-bold text-base">回報省錢新據點</h3>
+                    <button onclick="closeReportModal()" class="text-gray-400"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="space-y-2 text-xs">
+                    <div>
+                        <label class="font-bold text-gray-600 block mb-1">地點名稱</label>
+                        <input type="text" id="report-name" placeholder="例如：7-11 即期便當 7折區" class="w-full bg-gray-100 p-2.5 rounded-xl border-none focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="font-bold text-gray-600 block mb-1">詳細說明與注意事項</label>
+                        <textarea id="report-desc" placeholder="請填寫具體位置、價格或優惠時段..." class="w-full bg-gray-100 p-2.5 rounded-xl border-none focus:outline-none h-20"></textarea>
+                    </div>
+                    <div class="bg-yellow-50 border border-yellow-200 p-2.5 rounded-xl text-yellow-800 text-[11px] leading-relaxed">
+                        <i class="fa-solid fa-circle-info mr-1"></i>
+                        <b>社群守則：</b>若經多位使用者點擊「回報失效」，該地圖標記將會自動下架！
+                    </div>
+                </div>
+                <button onclick="submitReport()" class="w-full bg-yellow-400 text-black font-bold py-2.5 rounded-xl shadow text-xs">
+                    確認送出回報
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Leaflet.js 地圖 JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        let map = L.map('map', {zoomControl: false}).setView([22.6398, 120.3026], 15);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        // 豐富的模擬資料點
+        let markersData = [
+            { id: 1, lat: 22.6410, lng: 120.3010, title: "高醫附近 60元佛心炒飯", desc: "份量超大，學生憑證再折 5元。", trust: 42, invalidCount: 0, status: "正常" },
+            { id: 2, lat: 22.6380, lng: 120.3050, title: "全家超商 - 即期便當 7折區", desc: "每天晚上 8 點後品項最多。", trust: 18, invalidCount: 1, status: "注意：有人回報品項已售完" },
+            { id: 3, lat: 22.6355, lng: 120.2980, title: "高雄火車站 - 免費飮水與充電", desc: "大廳提供友善座談區與免費插座。", trust: 56, invalidCount: 0, status: "正常運作" },
+            { id: 4, lat: 22.6440, lng: 120.3075, title: "十全路 50元大份量肉燥飯", desc: "附贈免費柴魚湯，月底省錢好去處。", trust: 31, invalidCount: 0, status: "正常" },
+            { id: 5, lat: 22.6360, lng: 120.3120, title: "全聯福利中心 - 麵包即期 8折區", desc: "下午 5 點過後陸續貼標折價。", trust: 25, invalidCount: 2, status: "注意：品項消耗速度快" },
+            { id: 6, lat: 22.6420, lng: 120.2950, title: "三鳳中街 - 試吃大隊集散地", desc: "店家週末常有免費零嘴試吃。", trust: 14, invalidCount: 0, status: "週末限定" }
+        ];
+
+        let currentMarkers = [];
+        let activeItem = null;
+
+        function renderMarkers(keyword = '') {
+            currentMarkers.forEach(m => map.removeLayer(m));
+            currentMarkers = [];
+
+            markersData.forEach(item => {
+                if (item.invalidCount >= 3) return; // 累積 3 次失效自動隱藏
+                if (keyword && !item.title.includes(keyword) && !item.desc.includes(keyword)) return;
+
+                // 修正：完整顯示地點名稱，不再發生抓不到第二個字而出現 '-' 的問題
+                let markerIcon = L.divIcon({
+                    className: 'custom-pin',
+                    html: `<div class="bg-black text-white text-xs px-3 py-1 rounded-full shadow-lg border border-yellow-400 font-bold flex items-center space-x-1 whitespace-nowrap">
+                             <span>🔥 ${item.title}</span>
+                           </div>`,
+                    iconSize: [null, 30]
+                });
+
+                let marker = L.marker([item.lat, item.lng], {icon: markerIcon}).addTo(map);
+                marker.on('click', () => showLocationCard(item));
+                currentMarkers.push(marker);
+            });
+        }
+
+        renderMarkers();
+
+        function filterMarkers() {
+            let keyword = document.getElementById('search-input').value;
+            renderMarkers(keyword);
+        }
+
+        function showLocationCard(item) {
+            activeItem = item;
+            document.getElementById('card-title').innerText = item.title;
+            document.getElementById('card-desc').innerText = item.desc;
+            document.getElementById('trust-count').innerText = item.trust;
+            document.getElementById('card-reports').innerText = `已被回報失效：${item.invalidCount} 次`;
+            document.getElementById('card-status').innerText = `社群狀態：${item.status}`;
+            
+            document.getElementById('location-card').classList.remove('translate-y-full');
+        }
+
+        function closeCard() {
+            document.getElementById('location-card').classList.add('translate-y-full');
+        }
+
+        function voteTrust(val) {
+            if (!activeItem) return;
+            activeItem.trust += val;
+            document.getElementById('trust-count').innerText = activeItem.trust;
+            alert('感謝您的回饋！這有助於提升社群共識。');
+        }
+
+        function reportInvalid() {
+            if (!activeItem) return;
+            activeItem.invalidCount += 1;
+            document.getElementById('card-reports').innerText = `已被回報失效：${activeItem.invalidCount} 次`;
+            
+            if (activeItem.invalidCount >= 3) {
+                alert('此地點已被多位使用者回報失效，系統已自動將其下架！');
+                closeCard();
+                renderMarkers();
+            } else {
+                alert(`已送出失效回報（目前累積 ${activeItem.invalidCount}/3 次）。`);
+            }
+        }
+
+        function openReportModal() { document.getElementById('report-modal').classList.remove('hidden'); }
+        function closeReportModal() { document.getElementById('report-modal').classList.add('hidden'); }
+        
+        function submitReport() {
+            let name = document.getElementById('report-name').value;
+            let desc = document.getElementById('report-desc').value;
+            if(!name) { alert('請輸入地點名稱！'); return; }
+
+            let center = map.getCenter();
+            let newLat = center.lat + (Math.random() - 0.5) * 0.005;
+            let newLng = center.lng + (Math.random() - 0.5) * 0.005;
+
+            let newItem = {
+                id: markersData.length + 1,
+                lat: newLat,
+                lng: newLng,
+                title: name,
+                desc: desc || "無詳細說明",
+                trust: 1,
+                invalidCount: 0,
+                status: "新回報（審核中）"
+            };
+
+            markersData.push(newItem);
+            renderMarkers();
+
+            alert('回報成功！新據點已即時新增至地圖上。');
+            closeReportModal();
+            document.getElementById('report-name').value = '';
+            document.getElementById('report-desc').value = '';
+        }
+    </script>
+</body>
+</html>
