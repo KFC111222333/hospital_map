@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>乞丐地圖 - 韓系極簡版</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- FontAwesome 圖示 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Leaflet.js 地圖 CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+    <style>
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+        }
+
+        #map {
+            height: 100%;
+            min-height: 300px;
+            width: 100%;
+            z-index: 10;
+            background: #f4f4f5;
+        }
+
+        .custom-pin {
+            background: transparent;
+            border: 0;
+        }
+    </style>
+</head>
+
+<body class="bg-zinc-950 text-zinc-900 flex justify-center items-center h-screen m-0 overflow-hidden font-sans">
+
+    <!-- 手機外框容器 -->
+    <div class="w-full max-w-md h-full sm:h-[840px] sm:rounded-[40px] sm:ring-8 sm:ring-zinc-800 bg-white flex flex-col relative overflow-hidden shadow-2xl">
+
+        <!-- 頂部搜尋與過濾列 -->
+        <div class="bg-white/90 backdrop-blur-md px-4 py-3.5 border-b border-zinc-100 flex items-center space-x-2 z-20">
+            <div class="flex-1 bg-zinc-100 flex items-center px-3.5 py-2.5 rounded-2xl space-x-2">
+                <i class="fa-solid fa-magnifying-glass text-zinc-400 text-xs"></i>
+                <input
+                    type="text"
+                    id="search-input"
+                    placeholder="搜尋附近平價美食、即期品..."
+                    class="bg-transparent text-xs w-full focus:outline-none text-zinc-800"
+                    oninput="filterMarkers()"
+                >
+            </div>
+            <button
+                onclick="openReportModal()"
+                class="bg-zinc-900 text-white px-4 py-2.5 rounded-2xl text-xs font-bold flex items-center space-x-1 shadow-md hover:bg-zinc-800 transition"
+            >
+                <i class="fa-solid fa-plus text-[10px]"></i>
+                <span>回報</span>
+            </button>
+        </div>
+
+        <!-- 地圖互動主畫面 -->
+        <div class="flex-1 relative min-h-0">
+            <div id="map"></div>
+        </div>
+
+        <!-- 地點詳細卡片 -->
+        <div id="location-card" class="absolute bottom-0 left-0 right-0 bg-white rounded-t-[32px] shadow-[0_-10px_30px_rgba(0,0,0,0.1)] p-6 z-30 transform translate-y-full transition-transform duration-300">
+            <div class="w-10 h-1 bg-zinc-200 rounded-full mx-auto mb-4"></div>
+
+            <div class="flex justify-between items-start mb-2">
+                <div>
+                    <span id="card-badge" class="bg-amber-100 text-amber-800 text-[10px] font-bold px-2.5 py-1 rounded-full">社群精選</span>
+                    <h3 id="card-title" class="font-black text-lg mt-1.5 text-zinc-900">地點名稱</h3>
+                </div>
+                <button onclick="closeCard()" class="text-zinc-400 hover:text-zinc-900 w-8 h-8 flex items-center justify-center rounded-full bg-zinc-100" aria-label="關閉地點資訊">
+                    <i class="fa-solid fa-xmark text-sm"></i>
+                </button>
+            </div>
+
+            <p id="card-desc" class="text-xs text-zinc-500 mb-4 leading-relaxed">地點詳細說明...</p>
+
+            <!-- 狀態與審核區 -->
+            <div class="bg-zinc-50 p-3.5 rounded-2xl border border-zinc-100 mb-4 space-y-2.5">
+                <div class="flex items-center justify-between text-[11px]">
+                    <div class="flex items-center space-x-1.5 text-emerald-600">
+                        <i class="fa-solid fa-shield-halved"></i>
+                        <span id="card-status" class="font-bold text-zinc-700">社群共識度：尚無足夠資料</span>
+                    </div>
+                    <span id="card-reports" class="text-rose-500 font-bold">已被回報失效：0 次</span>
+                </div>
+
+                <!-- 投票與回報失效按鈕 -->
+                <div class="flex items-center space-x-2 pt-2 border-t border-zinc-200/50">
+                    <button onclick="voteTrust(1)" class="flex-1 bg-white border border-zinc-200 py-2 rounded-xl text-xs font-bold hover:bg-emerald-50 hover:border-emerald-200 text-emerald-600 flex items-center justify-center space-x-1 transition">
+                        <i class="fa-solid fa-thumbs-up"></i>
+                        <span>有效 (<span id="trust-count">24</span>)</span>
+                    </button>
+                    <button onclick="voteTrust(-1)" class="flex-1 bg-white border border-zinc-200 py-2 rounded-xl text-xs font-bold hover:bg-rose-50 hover:border-rose-200 text-rose-500 flex items-center justify-center space-x-1 transition">
+                        <i class="fa-solid fa-thumbs-down"></i>
+                        <span>不實</span>
+                    </button>
+                    <button onclick="reportInvalid()" class="bg-amber-50 border border-amber-200 px-3.5 py-2 rounded-xl text-xs font-bold text-amber-700 hover:bg-amber-100 flex items-center space-x-1 transition">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        <span>失效</span>
+                    </button>
+                </div>
+            </div>
+
+            <button onclick="navigateToActive()" class="w-full bg-zinc-900 text-white py-3 rounded-2xl text-xs font-bold shadow-lg hover:bg-zinc-800 transition">
+                導航前往此地點
+            </button>
+        </div>
+
+        <!-- 回報新地點彈窗 -->
+        <div id="report-modal" class="absolute inset-0 bg-zinc-950/60 backdrop-blur-sm z-40 hidden items-center justify-center p-4">
+            <div class="bg-white w-full max-w-sm rounded-[32px] p-6 shadow-2xl space-y-4">
+                <div class="flex justify-between items-center">
+                    <h3 class="font-black text-base text-zinc-900">回報省錢新據點</h3>
+                    <button onclick="closeReportModal()" class="text-zinc-400 hover:text-zinc-900" aria-label="關閉回報視窗">
+                        <i class="fa-solid fa-xmark text-base"></i>
+                    </button>
+                </div>
+
+                <div class="space-y-3 text-xs">
+                    <div>
+                        <label for="report-name" class="font-bold text-zinc-700 block mb-1">地點名稱</label>
+                        <input type="text" id="report-name" placeholder="例如：某某超商 7 折即期品" class="w-full bg-zinc-100 p-3 rounded-2xl border-none focus:outline-none text-zinc-800">
+                    </div>
+                    <div>
+                        <label for="report-desc" class="font-bold text-zinc-700 block mb-1">詳細說明與注意事項</label>
+                        <textarea id="report-desc" placeholder="請填寫具體位置、價格或優惠時段..." class="w-full bg-zinc-100 p-3 rounded-2xl border-none focus:outline-none h-24 text-zinc-800 resize-none"></textarea>
+                    </div>
+                    <div class="bg-amber-50 border border-amber-200 p-3 rounded-2xl text-amber-900 text-[11px] leading-relaxed">
+                        <i class="fa-solid fa-circle-info mr-1 text-amber-600"></i>
+                        <b>社群守則：</b>若同一裝置多次回報，仍只會在目前瀏覽器的示範資料中累計；正式多人共享需要後端資料庫與防濫用機制。
+                    </div>
+                </div>
+
+                <button onclick="submitReport()" class="w-full bg-amber-400 text-zinc-950 font-black py-3 rounded-2xl shadow-md hover:bg-amber-300 transition text-xs">
+                    確認送出回報
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet.js 地圖 JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        let map = null;
+        let currentMarkers = [];
+        let activeItem = null;
+
+        // 示範資料：座標位於高雄醫學大學及高雄車站周邊；實際店家資訊請出發前確認。
+        let markersData = [
+            { id: 1, lat: 22.6410, lng: 120.3010, title: "高醫附近 60 元佛心炒飯", desc: "份量超大，學生憑證再折 5 元。此為示範資料，請先確認店家與價格。", trust: 42, invalidCount: 0, status: "正常" },
+            { id: 2, lat: 22.6380, lng: 120.3050, title: "全家超商－即期便當 7 折區", desc: "每天晚上 8 點後品項可能較多，依門市現場為準。此為示範資料。", trust: 18, invalidCount: 1, status: "注意：品項消耗中" },
+            { id: 3, lat: 22.6355, lng: 120.2980, title: "高雄火車站－飲水與充電", desc: "請確認車站當前開放區域及插座使用規定。此為示範資料。", trust: 56, invalidCount: 0, status: "正常運作" },
+            { id: 4, lat: 22.6440, lng: 120.3075, title: "十全路 50 元大份量肉燥飯", desc: "附贈免費柴魚湯。此為示範資料，請先確認店家與價格。", trust: 31, invalidCount: 0, status: "正常" }
+        ];
+
+        function initMap() {
+            const mapElement = document.getElementById('map');
+
+            if (typeof L === 'undefined') {
+                mapElement.innerHTML = '<div style="padding:20px;font:14px sans-serif;color:#991b1b">地圖程式載入失敗。請確認網路可連線，並允許載入 unpkg.com 的 Leaflet 資源。</div>';
+                console.error('Leaflet failed to load: L is undefined.');
+                return;
+            }
+
+            map = L.map('map', {
+                zoomControl: false
+            }).setView([22.6398, 120.3026], 15);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(map);
+
+            L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+            renderMarkers();
+
+            // 修正容器尺寸尚未完成計算時，Leaflet 地圖可能顯示不完整的問題。
+            requestAnimationFrame(() => map.invalidateSize(true));
+            setTimeout(() => map.invalidateSize(true), 300);
+
+            window.addEventListener('resize', () => {
+                if (map) map.invalidateSize(true);
+            });
+        }
+
+        function renderMarkers(keyword = '') {
+            if (!map) return;
+
+            currentMarkers.forEach(marker => map.removeLayer(marker));
+            currentMarkers = [];
+
+            const normalizedKeyword = keyword.trim().toLocaleLowerCase();
+
+            markersData.forEach(item => {
+                if (item.invalidCount >= 3) return;
+
+                const searchableText = `${item.title} ${item.desc}`.toLocaleLowerCase();
+                if (normalizedKeyword && !searchableText.includes(normalizedKeyword)) return;
+
+                const markerIcon = L.divIcon({
+                    className: 'custom-pin',
+                    html: `
+                        <div style="display:flex;align-items:center;gap:6px;background:#18181b;color:#fff;font-size:11px;padding:6px 10px;border-radius:999px;box-shadow:0 4px 12px #0003;border:1px solid #fbbf24;font-weight:700;white-space:nowrap;width:max-content;max-width:240px;">
+                            <span style="color:#fbbf24">🔥</span>
+                            <span style="overflow:hidden;text-overflow:ellipsis;">${escapeHTML(item.title)}</span>
+                        </div>`,
+                    iconSize: [1, 32],
+                    iconAnchor: [0, 16]
+                });
+
+                const marker = L.marker([item.lat, item.lng], { icon: markerIcon }).addTo(map);
+                marker.on('click', () => showLocationCard(item));
+                currentMarkers.push(marker);
+            });
+        }
+
+        function escapeHTML(value) {
+            return String(value).replace(/[&<>"']/g, char => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            })[char]);
+        }
+
+        function filterMarkers() {
+            const keyword = document.getElementById('search-input').value;
+            renderMarkers(keyword);
+        }
+
+        function showLocationCard(item) {
+            activeItem = item;
+            document.getElementById('card-title').innerText = item.title;
+            document.getElementById('card-desc').innerText = item.desc;
+            document.getElementById('trust-count').innerText = item.trust;
+            document.getElementById('card-reports').innerText = `已被回報失效：${item.invalidCount} 次`;
+            document.getElementById('card-status').innerText = `狀態：${item.status}`;
+            document.getElementById('location-card').classList.remove('translate-y-full');
+        }
+
+        function closeCard() {
+            document.getElementById('location-card').classList.add('translate-y-full');
+        }
+
+        function voteTrust(value) {
+            if (!activeItem) return;
+
+            activeItem.trust = Math.max(0, activeItem.trust + value);
+            document.getElementById('trust-count').innerText = activeItem.trust;
+            alert('感謝您的回饋！目前票數僅儲存在此頁面的記憶體中。');
+        }
+
+        function reportInvalid() {
+            if (!activeItem) return;
+
+            activeItem.invalidCount += 1;
+            document.getElementById('card-reports').innerText =
+                `已被回報失效：${activeItem.invalidCount} 次`;
+
+            if (activeItem.invalidCount >= 3) {
+                alert('此地點已累積 3 次失效回報，已從目前地圖移除。此狀態尚未同步至其他使用者。');
+                closeCard();
+                renderMarkers(document.getElementById('search-input').value);
+            } else {
+                alert(`已送出失效回報（目前累積 ${activeItem.invalidCount}/3 次）。`);
+            }
+        }
+
+        function openReportModal() {
+            const modal = document.getElementById('report-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeReportModal() {
+            const modal = document.getElementById('report-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function submitReport() {
+            const name = document.getElementById('report-name').value.trim();
+            const desc = document.getElementById('report-desc').value.trim();
+
+            if (!name) {
+                alert('請輸入地點名稱！');
+                return;
+            }
+
+            if (!map) {
+                alert('地圖尚未初始化，請重新整理頁面後再試。');
+                return;
+            }
+
+            // 示範版本：新據點暫時放在目前地圖中心附近，並非精確店家座標。
+            const center = map.getCenter();
+            const newItem = {
+                id: Date.now(),
+                lat: center.lat + (Math.random() - 0.5) * 0.005,
+                lng: center.lng + (Math.random() - 0.5) * 0.005,
+                title: name,
+                desc: desc || '無詳細說明',
+                trust: 1,
+                invalidCount: 0,
+                status: '新回報（示範資料）'
+            };
+
+            markersData.push(newItem);
+            renderMarkers(document.getElementById('search-input').value);
+
+            alert('回報成功！新標記已新增至目前地圖。此示範版本不會將資料永久儲存或同步給其他使用者。');
+            closeReportModal();
+            document.getElementById('report-name').value = '';
+            document.getElementById('report-desc').value = '';
+        }
+
+        function navigateToActive() {
+            if (!activeItem) return;
+
+            const url = `https://www.google.com/maps/dir/?api=1&destination=${activeItem.lat},${activeItem.lng}`;
+            window.open(url, '_blank', 'noopener,noreferrer');
+        }
+
+        // 等待 DOM 與 Leaflet 腳本就緒後初始化。
+        document.addEventListener('DOMContentLoaded', initMap);
+    </script>
+</body>
+</html>
